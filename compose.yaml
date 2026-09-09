@@ -1,0 +1,19 @@
+name: project-management-mvp
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: production
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${PM_PORT:-8000}:8000"
+    volumes:
+      - pm-data:/app/data
+    init: true
+
+volumes:
+  pm-data:

@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "database": {
+    "engine": "SQLite",
+    "file": "/app/data/project_management.db",
+    "id_strategy": "UUIDv7 stored as TEXT",
+    "timestamp_strategy": "UTC ISO-8601 text",
+    "pragmas": {
+      "foreign_keys": "ON",
+      "journal_mode": "WAL",
+      "busy_timeout": 5000
+    }
+  },
+  "tables": {
+    "schema_migrations": {
+      "purpose": "Records each applied database migration.",
+      "columns": {
+        "version": {
+          "type": "INTEGER",
+          "primary_key": true,
+          "nullable": false
+        },
+        "name": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "applied_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [],
+      "indexes": []
+    },
+    "users": {
+      "purpose": "Owns boards and supports future multi-user authentication.",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "primary_key": true,
+          "nullable": false
+        },
+        "username": {
+          "type": "TEXT",
+          "nullable": false,
+          "collation": "NOCASE"
+        },
+        "password_hash": {
+          "type": "TEXT",
+          "nullable": true,
+          "note": "Unused by hardcoded MVP authentication; reserved for future secure authentication."
+        },
+        "created_at": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [
+        "UNIQUE (username)",
+        "CHECK (length(trim(username)) > 0)"
+      ],
+      "indexes": []
+    },
+    "boards": {
+      "purpose": "Represents a project board owned by one user.",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "primary_key": true,
+          "nullable": false
+        },
+        "user_id": {
+          "type": "TEXT",
+          "nullable": false,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        "title": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "version": {
+          "type": "INTEGER",
+          "nullable": false,
+          "default": 0,
+          "note": "Incremented on every board mutation and used to reject stale AI proposals."
+        },
+        "created_at": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [
+        "CHECK (length(trim(title)) > 0)",
+        "CHECK (version >= 0)"
+      ],
+      "indexes": [
+        {
+          "name": "idx_boards_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "board_columns": {
+      "purpose": "Stores the ordered workflow columns for a board.",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "primary_key": true,
+          "nullable": false
+        },
+        "board_id": {
+          "type": "TEXT",
+          "nullable": false,
+          "references": {
+            "table": "boards",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        "title": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "position": {
+          "type": "INTEGER",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [
+        "UNIQUE (board_id, position)",
+        "CHECK (length(trim(title)) > 0)",
+        "CHECK (position >= 0)"
+      ],
+      "indexes": [
+        {
+          "name": "idx_board_columns_board_id",
+          "columns": [
+            "board_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "cards": {
+      "purpose": "Stores ordered cards within a board column.",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "primary_key": true,
+          "nullable": false
+        },
+        "column_id": {
+          "type": "TEXT",
+          "nullable": false,
+          "references": {
+            "table": "board_columns",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        "title": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "details": {
+          "type": "TEXT",
+          "nullable": false,
+          "default": ""
+        },
+        "position": {
+          "type": "INTEGER",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [
+        "UNIQUE (column_id, position)",
+        "CHECK (length(trim(title)) > 0)",
+        "CHECK (position >= 0)"
+      ],
+      "indexes": [
+        {
+          "name": "idx_cards_column_id",
+          "columns": [
+            "column_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "chat_messages": {
+      "purpose": "Stores board-scoped conversation history and optional AI board-change proposals.",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "primary_key": true,
+          "nullable": false
+        },
+        "board_id": {
+          "type": "TEXT",
+          "nullable": false,
+          "references": {
+            "table": "boards",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        "role": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "content": {
+          "type": "TEXT",
+          "nullable": false
+        },
+        "proposed_operations_json": {
+          "type": "TEXT",
+          "nullable": true,
+          "note": "Validated JSON array of proposed board operations on assistant messages."
+        },
+        "proposal_status": {
+          "type": "TEXT",
+          "nullable": true
+        },
+        "base_board_version": {
+          "type": "INTEGER",
+          "nullable": true,
+          "note": "Board version used when the AI proposal was generated."
+        },
+        "created_at": {
+          "type": "TEXT",
+          "nullable": false
+        }
+      },
+      "constraints": [
+        "CHECK (role IN ('user', 'assistant'))",
+        "CHECK (length(trim(content)) > 0)",
+        "CHECK (proposed_operations_json IS NULL OR json_valid(proposed_operations_json))",
+        "CHECK (proposal_status IS NULL OR proposal_status IN ('pending', 'confirmed', 'rejected', 'stale'))",
+        "CHECK ((proposed_operations_json IS NULL AND proposal_status IS NULL AND base_board_version IS NULL) OR (role = 'assistant' AND proposed_operations_json IS NOT NULL AND proposal_status IS NOT NULL AND base_board_version IS NOT NULL))"
+      ],
+      "indexes": [
+        {
+          "name": "idx_chat_messages_board_created",
+          "columns": [
+            "board_id",
+            "created_at",
+            "id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_chat_messages_pending_proposals",
+          "columns": [
+            "board_id",
+            "proposal_status"
+          ],
+          "unique": false,
+          "where": "proposal_status = 'pending'"
+        }
+      ]
+    }
+  },
+  "seed": {
+    "user": {
+      "username": "user",
+      "password_hash": null
+    },
+    "board": {
+      "title": "Kanban Studio",
+      "columns": [
+        "Backlog",
+        "Discovery",
+        "In Progress",
+        "Review",
+        "Done"
+      ]
+    },
+    "behavior": "Create the MVP user, their first board, fixed columns, and demo cards only when the user does not already exist."
+  }
+}
