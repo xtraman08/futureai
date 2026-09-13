@@ -1,5 +1,7 @@
 # Project Management MVP
 
+> **Status:** In progress. Expected completion: 2026-09-19 (1 week out).
+
 ## Run with Docker
 
 Prerequisite: Docker Desktop or Docker Engine with Compose.
